@@ -1,0 +1,13 @@
+dependencies:
+  idf: ">=5.4"
+
+  esp-radar:
+    version: ">=0.3.2"
+
+  esp_csi_gain_ctrl:
+    version: ">=0.1.5"
+
+  esp_radar_motion_dec:
+    version: ">=0.1.0"
+
+  espressif/esp-sr: "*"

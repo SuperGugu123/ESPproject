@@ -1,0 +1,22 @@
+menu "Example Configuration"
+
+    config BROKER_URL
+        string "MQTT broker URL"
+        default "mqtt://homeassistant.local:1883"
+        help
+            MQTT broker address. For Home Assistant, this is usually the
+            Mosquitto broker add-on URL, for example mqtt://homeassistant.local:1883.
+
+    config BROKER_USERNAME
+        string "MQTT broker username"
+        default "Home Assistant Username"
+        help
+            MQTT username configured in Home Assistant or the Mosquitto broker.
+
+    config BROKER_PASSWORD
+        string "MQTT broker password"
+        default "Home Assistant Password"
+        help
+            MQTT password configured in Home Assistant or the Mosquitto broker.
+
+endmenu
