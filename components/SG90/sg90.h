@@ -13,7 +13,7 @@
 #include "esp_log.h"
 
 /* SG90 PWM 控制引脚 */
-#define SG90_PWM_PIN GPIO_NUM_6
+#define SG90_PWM_PIN GPIO_NUM_7
 /* 距离阈值，单位为毫米；超过该距离时打开舵机 */
 #define SG90_DISTANCE_THRESHOLD_MM 200
 /* 舵机最小脉宽，单位为微秒 */

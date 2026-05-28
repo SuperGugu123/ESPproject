@@ -1,7 +1,44 @@
 #include "app_ota.h"
 
+static const char *TAG = "APP_MQTT";
+uint8_t ota_write_data[BUFFSIZE] = {0};
+
+void task_fatal_error(void)
+{
+    ESP_LOGE(TAG, "Fatal error, infinite loop");
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void http_cleanup(esp_http_client_handle_t client)
+{
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+}
+
+void infinite_loop(void)
+{
+    ESP_LOGW(TAG, "Entering infinite loop");
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void print_sha256(const uint8_t *sha_256, const char *line)
+{
+    char sha256_str[HASH_LEN * 2 + 1] = {0};
+    for (int i = 0; i < HASH_LEN; i++)
+    {
+        snprintf(&sha256_str[i * 2], 3, "%02x", sha_256[i]);
+    }
+    ESP_LOGI(TAG, "%s%s", line, sha256_str);
+}
+
 // OTA 升级任务函数
-static void ota_task(void *pvParameter)
+void ota_task(void *pvParameter)
 {
     esp_err_t err;
     // OTA 更新句柄：由 esp_ota_begin() 设置，必须通过 esp_ota_end() 释放
@@ -26,10 +63,8 @@ static void ota_task(void *pvParameter)
 
     // 配置 HTTP 客户端，从 menuconfig 获取固件 URL
     esp_http_client_config_t config = {
-        .url = CONFIG_EXAMPLE_FIRMWARE_UPG_URL // http固件下载地址,
-                   .cert_pem = (char *)server_cert_pem_start,
+        .url = OTA_UPDATE_HTTP_URL,
         .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
-        .keep_alive_enable = true,
     };
     // 初始化 HTTP 客户端
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -59,7 +94,7 @@ static void ota_task(void *pvParameter)
     // 循环接收固件数据
     while (1)
     {
-        int data_read = esp_http_client_read(client, ota_write_data, BUFFSIZE);
+        int data_read = esp_http_client_read(client, (char *)ota_write_data, BUFFSIZE);
         if (data_read < 0)
         {
             ESP_LOGE(TAG, "错误：SSL 数据读取失败");
@@ -211,11 +246,8 @@ static bool diagnostic(void)
     return true;
 }
 
-// 应用主入口
-void app_main(void)
+void ota_start(void)
 {
-    ESP_LOGI(TAG, "OTA 示例 app_main 开始");
-
     uint8_t sha_256[HASH_LEN] = {0};
     esp_partition_t partition;
 
@@ -224,18 +256,15 @@ void app_main(void)
     partition.size = ESP_PARTITION_TABLE_MAX_LEN;
     partition.type = ESP_PARTITION_TYPE_DATA;
     esp_partition_get_sha256(&partition, sha_256);
-    print_sha256(sha_256, "分区表的 SHA-256: ");
 
     // 计算 Bootloader 的 SHA-256 摘要
     partition.address = ESP_BOOTLOADER_OFFSET;
     partition.size = ESP_PARTITION_TABLE_OFFSET;
     partition.type = ESP_PARTITION_TYPE_APP;
     esp_partition_get_sha256(&partition, sha_256);
-    print_sha256(sha_256, "Bootloader 的 SHA-256: ");
 
     // 计算当前运行固件的 SHA-256 摘要
     esp_partition_get_sha256(esp_ota_get_running_partition(), sha_256);
-    print_sha256(sha_256, "当前固件的 SHA-256: ");
 
     // 检查 OTA 状态，执行固件回滚检查
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -259,8 +288,6 @@ void app_main(void)
         }
     }
 
-    ESP_ERROR_CHECK(wifista_init());
-
     // 创建 OTA 升级任务，栈大小 8192，优先级 5
-    xTaskCreate(&ota_example_task, "ota_task", 8192, NULL, 5, NULL);
+    xTaskCreate(&ota_task, "ota_task", 8192, NULL, 5, NULL);
 }

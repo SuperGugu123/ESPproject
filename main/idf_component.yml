@@ -11,3 +11,8 @@ dependencies:
     version: ">=0.1.0"
 
   espressif/esp-sr: "*"
+
+  espressif/esp_lcd_ili9341: "*"
+  lvgl/lvgl: "^9"
+  atanisoft/esp_lcd_touch_xpt2046:
+    git: https://github.com/atanisoft/esp_lcd_touch_xpt2046.git

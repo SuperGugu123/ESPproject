@@ -308,7 +308,7 @@ void radar_rx_cb(void *ctx, const wifi_radar_info_t *info)
     (void)ctx;
 
     if (g_training_in_progress || !g_thresholds_ready) {
-        ESP_LOGI(g_radar_tag, "state=training wander=%.3f jitter=%.3f",
+        ESP_LOGD(g_radar_tag, "state=training wander=%.3f jitter=%.3f",
                  info->waveform_wander, info->waveform_jitter);
         return;
     }
@@ -330,7 +330,7 @@ void radar_rx_cb(void *ctx, const wifi_radar_info_t *info)
 
     radar_update_stable_state(desired_state);
 
-    ESP_LOGI(g_radar_tag,
+    ESP_LOGD(g_radar_tag,
              "state=%s desired=%s confirm=%u wander=%.3f presence_sig=%.3f jitter=%.3f th_w=%.3f th_j=%.3f exit_w=%.3f exit_j=%.3f raw_w=%.3f raw_j=%.3f",
              radar_state_to_string(g_radar_state),
              radar_state_to_string(desired_state),

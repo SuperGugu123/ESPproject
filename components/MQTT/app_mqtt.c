@@ -1,4 +1,5 @@
 #include "app_mqtt.h"
+#include "app_ota.h"
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -59,15 +60,29 @@ esp_err_t mqtt_publish_command(const char *topic, const char *payload)
 esp_err_t mqtt_sg90_on(void)
 {
     return mqtt_publish_command(
-        "sg90/control",
+        "esp32/control",
         "{\"input\": \"sg90 on\", \"siteId\": \"esp32\"}");
 }
 
 esp_err_t mqtt_sg90_off(void)
 {
     return mqtt_publish_command(
-        "sg90/control",
+        "esp32/control",
         "{\"input\": \"sg90 off\", \"siteId\": \"esp32\"}");
+}
+
+esp_err_t mqtt_radar_state_empty(void)
+{
+    return mqtt_publish_command(
+        "esp32/radar/state",
+        "empty");
+}
+
+esp_err_t mqtt_radar_state_use(void)
+{
+    return mqtt_publish_command(
+        "esp32/radar/state",
+        "use");
 }
 
 bool mqtt_is_connected(void)
@@ -272,6 +287,48 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
             snprintf(status, sizeof(status), "angle=%d", angle);
             ESP_LOGI(TAG, "SG90 set angle=%d from MQTT", angle);
         }
+        else if (event->topic_len == strlen(MQTT_OTA_CMD_TOPIC) &&
+                 strncmp(event->topic, MQTT_OTA_CMD_TOPIC, event->topic_len) == 0)
+        {
+            if (event->current_data_offset != 0 || event->data_len != event->total_data_len)
+            {
+                ESP_LOGW(TAG, "Ignore fragmented OTA payload");
+                break;
+            }
+
+            char payload[32] = {0};
+            int copy_len = event->data_len;
+            if (copy_len >= (int)sizeof(payload))
+            {
+                copy_len = sizeof(payload) - 1;
+            }
+            memcpy(payload, event->data, copy_len);
+
+            char *ota_key = strstr(payload, "\"ota\"");
+            if (ota_key == NULL)
+            {
+                ESP_LOGW(TAG, "ota key not found in payload: %s", payload);
+                break;
+            }
+
+            char *colon = strchr(ota_key, ':');
+            if (colon == NULL)
+            {
+                ESP_LOGW(TAG, "invalid OTA payload: %s", payload);
+                break;
+            }
+
+            int start = atoi(colon + 1);
+            if (start == 1)
+            {
+                ESP_LOGI(TAG, "OTA start command received");
+                ota_start();
+            }
+            else
+            {
+                ESP_LOGI(TAG, "OTA start value=%d ignored", start);
+            }
+        }
         break;
 
     case MQTT_EVENT_ERROR:
@@ -300,20 +357,13 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
 void mqtt_app_start(void)
 {
     /*
-     * CONFIG_BROKER_URL / CONFIG_BROKER_USERNAME / CONFIG_BROKER_PASSWORD
-     * 来自 main/Kconfig.projbuild。
-     *
-     * 修改方式：
-     *   idf.py menuconfig
-     *   Example Configuration
-     *
      * 常见 Home Assistant Mosquitto 地址：
      *   mqtt://homeassistant.local:1883
      */
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = CONFIG_BROKER_URL,
-        .credentials.username = CONFIG_BROKER_USERNAME,
-        .credentials.authentication.password = CONFIG_BROKER_PASSWORD,
+        .broker.address.uri = MQTT_BROKER_URL,
+        .credentials.username = MQTT_BROKER_USERNAME,
+        .credentials.authentication.password = MQTT_BROKER_PASSWORD,
     };
 
     client = esp_mqtt_client_init(&mqtt_cfg);
@@ -322,7 +372,6 @@ void mqtt_app_start(void)
         ESP_LOGE(TAG, "Failed to initialize MQTT client");
         return;
     }
-
     /*
      * 注册所有 MQTT 事件。
      * 这样连接状态、发布确认、接收数据、错误诊断都集中在同一个回调里处理。
