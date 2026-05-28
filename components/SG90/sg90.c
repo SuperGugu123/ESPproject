@@ -5,26 +5,6 @@ static SemaphoreHandle_t s_sg90_mutex = NULL;
 static uint32_t s_current_angle = SG90_MIN_ANGLE;
 static TickType_t s_voice_override_until = 0;
 
-static esp_err_t sg90_set_angle_with_override(uint32_t angle, const char *source)
-{
-    esp_err_t err = sg90_set_angle(angle);
-    if (err != ESP_OK)
-    {
-        return err;
-    }
-
-    if (xSemaphoreTake(s_sg90_mutex, pdMS_TO_TICKS(100)) != pdTRUE)
-    {
-        return ESP_ERR_TIMEOUT;
-    }
-
-    s_voice_override_until = xTaskGetTickCount() + pdMS_TO_TICKS(SG90_VOICE_OVERRIDE_MS);
-    xSemaphoreGive(s_sg90_mutex);
-
-    ESP_LOGI(TAG, "%s override active for %d ms", source, SG90_VOICE_OVERRIDE_MS);
-    return ESP_OK;
-}
-
 uint32_t sg90_clamp_angle(uint32_t angle)
 {
     if (angle > SG90_MAX_ANGLE)
@@ -146,45 +126,8 @@ esp_err_t sg90_set_angle(uint32_t angle)
     return ESP_OK;
 }
 
-bool sg90_voice_override_active(void)
-{
-    bool active = false;
-    TickType_t now = xTaskGetTickCount();
-
-    if (s_sg90_mutex == NULL)
-    {
-        return false;
-    }
-
-    if (xSemaphoreTake(s_sg90_mutex, pdMS_TO_TICKS(100)) != pdTRUE)
-    {
-        return true;
-    }
-
-    active = (s_voice_override_until != 0) && ((int32_t)(s_voice_override_until - now) > 0);
-    xSemaphoreGive(s_sg90_mutex);
-
-    return active;
-}
-
-esp_err_t sg90_set_angle_from_voice(uint32_t angle)
-{
-    return sg90_set_angle_with_override(angle, "voice");
-}
-
-esp_err_t sg90_set_angle_from_mqtt(uint32_t angle)
-{
-    return sg90_set_angle_with_override(angle, "mqtt");
-}
-
 esp_err_t sg90_set_angle_from_radar(uint32_t angle)
 {
-    if (sg90_voice_override_active())
-    {
-        ESP_LOGD(TAG, "skip radar angle=%" PRIu32 " during voice override", angle);
-        return ESP_OK;
-    }
-
     return sg90_set_angle(angle);
 }
 

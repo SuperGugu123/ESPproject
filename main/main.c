@@ -10,9 +10,9 @@
 #include "app_mqtt.h"
 
 TaskHandle_t sg90_task_handle = NULL;
-static TaskHandle_t mqtt_sg90_demo_handle = NULL;
+TaskHandle_t mqtt_sg90_demo_handle = NULL;
 
-static void mqtt_sg90_demo_task(void *pvParameters)
+void mqtt_sg90_demo_task(void *pvParameters)
 {
     (void)pvParameters;
 
@@ -24,15 +24,7 @@ static void mqtt_sg90_demo_task(void *pvParameters)
             continue;
         }
 
-        esp_err_t ret = mqtt_sg90_on();
-        if (ret == ESP_OK)
-        {
-            ESP_LOGI("main", "Demo publish: sg90 on");
-        }
-        else
-        {
-            ESP_LOGW("main", "Skip sg90 on: %s", esp_err_to_name(ret));
-        }
+        mqtt_sg90_on();
 
         vTaskDelay(pdMS_TO_TICKS(5000));
 
@@ -41,15 +33,7 @@ static void mqtt_sg90_demo_task(void *pvParameters)
             continue;
         }
 
-        ret = mqtt_sg90_off();
-        if (ret == ESP_OK)
-        {
-            ESP_LOGI("main", "Demo publish: sg90 off");
-        }
-        else
-        {
-            ESP_LOGW("main", "Skip sg90 off: %s", esp_err_to_name(ret));
-        }
+        mqtt_sg90_off();
 
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
@@ -80,6 +64,7 @@ void app_main(void)
     sg90_init();
 
     /* 先只保留 Wi-Fi + MQTT，验证基础通信和下发控制。 */
+
     ESP_ERROR_CHECK(wifista_init());
     mqtt_app_start();
 

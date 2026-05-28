@@ -38,30 +38,12 @@ void sg90_init(void);
 esp_err_t sg90_set_angle(uint32_t angle);
 
 /*
- * 语音命令控制舵机。
- *
- * 语音属于手动控制，优先级高于雷达自动控制。
- * 调用成功后，SG90_VOICE_OVERRIDE_MS 时间内雷达任务不会覆盖舵机角度。
- */
-esp_err_t sg90_set_angle_from_voice(uint32_t angle);
-
-/*
- * MQTT 订阅命令控制舵机。
- *
- * MQTT 也属于手动控制，收到角度命令后会在一段时间内阻止雷达任务覆盖当前角度。
- */
-esp_err_t sg90_set_angle_from_mqtt(uint32_t angle);
-
-/*
  * 雷达自动控制舵机。
  *
  * 如果最近刚执行过语音命令，本函数会直接返回 ESP_OK，但不会改变舵机角度，
  * 避免雷达任务每 500ms 把语音设置的角度覆盖掉。
  */
 esp_err_t sg90_set_angle_from_radar(uint32_t angle);
-
-/* 查询当前是否处于语音优先控制时间内。 */
-bool sg90_voice_override_active(void);
 
 /* 将输入角度限制在舵机支持的范围内 */
 uint32_t sg90_clamp_angle(uint32_t angle);

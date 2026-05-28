@@ -219,7 +219,7 @@ void sr_handler_task(void *pvParam)
             {
             case 0:
                 // 模拟打开台灯
-                if (sg90_set_angle_from_voice(SG90_DEFAULT_OPEN_ANGLE) == ESP_OK)
+                if (sg90_set_angle(SG90_DEFAULT_OPEN_ANGLE) == ESP_OK)
                 {
                     ESP_LOGI(TAG, "opening the lamp, servo angle=%d", SG90_DEFAULT_OPEN_ANGLE);
                 }
@@ -231,7 +231,7 @@ void sr_handler_task(void *pvParam)
 
             case 1:
                 // 模拟关闭台灯
-                if (sg90_set_angle_from_voice(SG90_MIN_ANGLE) == ESP_OK)
+                if (sg90_set_angle(SG90_MIN_ANGLE) == ESP_OK)
                 {
                     ESP_LOGI(TAG, "closing the lamp, servo angle=%d", SG90_MIN_ANGLE);
                 }

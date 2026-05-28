@@ -4,6 +4,7 @@ set(srcs
     INMP441/app_sr.c
     SG90/sg90.c
     RADAR/radar.c
+    OTA/ota.c
     WIFI/wifista.c
     WIFI/wificsi.c)
 
@@ -12,6 +13,7 @@ set(include_dirs
     SG90
     RADAR
     MQTT
+    OTA
     WIFI)     
     
 set(requires

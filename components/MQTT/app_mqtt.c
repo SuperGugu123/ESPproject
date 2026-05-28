@@ -15,6 +15,7 @@
 
 static const char *TAG = "APP_MQTT";
 static const char *MQTT_SG90_CMD_TOPIC = "esp32/sg90/cmd";
+static const char *MQTT_OTA_CMD_TOPIC = "esp32/ota/cmd";
 
 /*
  * ESP-IDF 的 MQTT 客户端是异步工作的：
@@ -115,13 +116,14 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
         ESP_LOGI(TAG, "MQTT connected");
         {
             int msg_id = esp_mqtt_client_subscribe(client, MQTT_SG90_CMD_TOPIC, 1);
-            if (msg_id < 0)
-            {
-                ESP_LOGE(TAG, "Subscribe failed, topic=%s", MQTT_SG90_CMD_TOPIC);
-            }
-            else
+            int msg_id_ota = esp_mqtt_client_subscribe(client, MQTT_OTA_CMD_TOPIC, 1);
+            if (msg_id > 0)
             {
                 ESP_LOGI(TAG, "Subscribe queued, topic=%s, msg_id=%d", MQTT_SG90_CMD_TOPIC, msg_id);
+            }
+            if (msg_id_ota > 0)
+            {
+                ESP_LOGI(TAG, "Subscribe queued, topic=%s, msg_id=%d", MQTT_OTA_CMD_TOPIC, msg_id_ota);
             }
         }
         break;
