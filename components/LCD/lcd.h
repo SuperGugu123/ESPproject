@@ -14,7 +14,6 @@
 #include "esp_lcd_ili9341.h"
 #include "esp_lcd_touch_xpt2046.h"
 
-
 // 使用 SPI2 主机
 #define LCD_HOST SPI2_HOST
 
@@ -26,14 +25,15 @@
 #define LCD_BK_LIGHT_OFF_LEVEL !LCD_BK_LIGHT_ON_LEVEL // 背光关闭
 
 //  引脚定义
-#define PIN_NUM_SCLK 18     // SPI 时钟线 SCLK
-#define PIN_NUM_MOSI 19     // SPI MOSI（主机发数据给屏幕）
-#define PIN_NUM_MISO 21     // SPI MISO（屏幕回传数据，可设 -1 不用）
-#define PIN_NUM_LCD_DC 5    // 数据/命令选择线 D/C#（0=命令, 1=数据）
-#define PIN_NUM_LCD_RST 3   // LCD 硬件复位引脚（低电平复位）
-#define PIN_NUM_LCD_CS 4    // SPI 片选 CS（选中 LCD）
-#define PIN_NUM_BK_LIGHT 2  // 背光控制 GPIO
-#define PIN_NUM_TOUCH_CS 15 // 触摸屏 SPI 片选（共享同一 SPI 总线）
+#define PIN_NUM_SCLK 13     // SPI 时钟线 SCLK
+#define PIN_NUM_MOSI 12     // SPI MOSI（主机发数据给屏幕）
+#define PIN_NUM_MISO 5      // SPI MISO（屏幕回传数据，可设 -1 不用）
+#define PIN_NUM_LCD_DC 11   // 数据/命令选择线 D/C#（0=命令, 1=数据）
+#define PIN_NUM_LCD_RST 10  // LCD 硬件复位引脚（低电平复位）
+#define PIN_NUM_LCD_CS 9    // SPI 片选 CS（选中 LCD）
+#define PIN_NUM_BK_LIGHT 6  // 背光控制 GPIO
+#define PIN_NUM_TOUCH_CS 14 // 触摸屏 SPI 片选（共享同一 SPI 总线）
+#define PIN_NUM_TOUCH_IRQ 4 // 触摸屏中断检测引脚
 
 //  分辨率
 #define LCD_H_RES 240 // 水平方向像素数（X 轴）
@@ -44,7 +44,7 @@
 #define LCD_PARAM_BITS 8 // SPI 发送参数时用 8 位
 
 // 触摸使能开关
-#define LCD_TOUCH_ENABLED 0
+#define LCD_TOUCH_ENABLED 1
 
 // LCD 硬件初始化（纯硬件，屏幕点亮即结束）
 esp_err_t lcd_init(void);

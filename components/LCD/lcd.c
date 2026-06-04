@@ -81,7 +81,7 @@ esp_err_t lcd_init(void)
     ESP_ERROR_CHECK(esp_lcd_panel_reset(_panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_init(_panel_handle));
 
-    //  X 轴镜像（配合横屏方向）
+    //  X 轴镜像（字体正向）
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(_panel_handle, true, false));
 
     // 打开显示
@@ -107,14 +107,14 @@ esp_lcd_touch_handle_t lcd_touch_init(void)
 
     ESP_LOGI(TAG, "Init XPT2046 touch controller");
     esp_lcd_touch_config_t tp_cfg = {
-        .x_max = LCD_V_RES,
-        .y_max = LCD_H_RES,
+        .x_max = LCD_H_RES,
+        .y_max = LCD_V_RES,
         .rst_gpio_num = -1,
-        .int_gpio_num = -1,
+        .int_gpio_num = -1, 
         .flags = {
-            .swap_xy = 1,
+            .swap_xy = 0,
             .mirror_x = 1,
-            .mirror_y = 0,
+            .mirror_y = 1,
         },
     };
 
@@ -124,11 +124,12 @@ esp_lcd_touch_handle_t lcd_touch_init(void)
         .pclk_hz = 1 * 1000 * 1000,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
-        .spi_mode = 0,
+        .spi_mode = 3,
         .trans_queue_depth = 10,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &tp_io_cfg, &tp_io));
-    ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(tp_io, &tp_cfg, &_touch_handle));
-    ESP_LOGI(TAG, "Touch init success");
+    esp_err_t tp_err = esp_lcd_touch_new_spi_xpt2046(tp_io, &tp_cfg, &_touch_handle);
+    ESP_LOGI(TAG, "Touch init result: 0x%x handle=%p", tp_err, _touch_handle);
+    ESP_ERROR_CHECK(tp_err);
     return _touch_handle;
 }

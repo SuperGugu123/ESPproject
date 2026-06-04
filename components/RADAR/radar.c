@@ -28,7 +28,8 @@ static esp_err_t radar_load_train_data_from_nvs(void);
 
 const char *radar_state_to_string(radar_state_t state)
 {
-    switch (state) {
+    switch (state)
+    {
     case RADAR_STATE_PRESENCE:
         return "presence";
     case RADAR_STATE_MOTION:
@@ -41,7 +42,8 @@ const char *radar_state_to_string(radar_state_t state)
 
 float radar_get_effective_threshold(float raw_threshold, float scale)
 {
-    if (raw_threshold <= 0.05f) {
+    if (raw_threshold <= 0.05f)
+    {
         return raw_threshold;
     }
 
@@ -57,11 +59,13 @@ void radar_reset_state_machine(void)
 
 static float radar_get_presence_signal(float wander, float jitter, float motion_enter_threshold)
 {
-    if (wander > 0.0001f) {
+    if (wander > 0.0001f)
+    {
         return wander;
     }
 
-    if (jitter >= RADAR_PRESENCE_JITTER_FALLBACK_MIN && jitter < motion_enter_threshold) {
+    if (jitter >= RADAR_PRESENCE_JITTER_FALLBACK_MIN && jitter < motion_enter_threshold)
+    {
         return RADAR_WANDER_FALLBACK_VALUE;
     }
 
@@ -75,27 +79,32 @@ static esp_err_t radar_save_train_data_to_nvs(void)
     size_t train_data_size = 0;
     esp_err_t ret = esp_radar_get_train_data_size(&train_data_size);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGW(g_radar_tag, "unable to get train data size: %s", esp_err_to_name(ret));
         return ret;
     }
 
     train_data = malloc(train_data_size);
-    if (train_data == NULL) {
+    if (train_data == NULL)
+    {
         return ESP_ERR_NO_MEM;
     }
 
     ret = esp_radar_export_train_data(train_data, train_data_size, NULL);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         free(train_data);
         ESP_LOGW(g_radar_tag, "unable to export train data: %s", esp_err_to_name(ret));
         return ret;
     }
 
     ret = nvs_open(RADAR_NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ret = nvs_set_blob(handle, RADAR_TRAIN_DATA_KEY, train_data, train_data_size);
-        if (ret == ESP_OK) {
+        if (ret == ESP_OK)
+        {
             ret = nvs_commit(handle);
         }
         nvs_close(handle);
@@ -103,7 +112,8 @@ static esp_err_t radar_save_train_data_to_nvs(void)
 
     free(train_data);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGW(g_radar_tag, "save train data failed: %s", esp_err_to_name(ret));
         return ret;
     }
@@ -119,32 +129,37 @@ static esp_err_t radar_load_train_data_from_nvs(void)
     size_t train_data_size = 0;
     esp_err_t ret = nvs_open(RADAR_NVS_NAMESPACE, NVS_READONLY, &handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         return ret;
     }
 
     ret = nvs_get_blob(handle, RADAR_TRAIN_DATA_KEY, NULL, &train_data_size);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         nvs_close(handle);
         return ret;
     }
 
     train_data = malloc(train_data_size);
-    if (train_data == NULL) {
+    if (train_data == NULL)
+    {
         nvs_close(handle);
         return ESP_ERR_NO_MEM;
     }
 
     ret = nvs_get_blob(handle, RADAR_TRAIN_DATA_KEY, train_data, &train_data_size);
     nvs_close(handle);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         free(train_data);
         return ret;
     }
 
     ret = esp_radar_import_train_data(train_data, train_data_size);
     free(train_data);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGW(g_radar_tag, "restore train data failed: %s", esp_err_to_name(ret));
         return ret;
     }
@@ -166,19 +181,22 @@ esp_err_t radar_save_thresholds_to_nvs(void)
     };
 
     esp_err_t ret = nvs_open(RADAR_NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(g_radar_tag, "open NVS for save failed: %s", esp_err_to_name(ret));
         return ret;
     }
 
     ret = nvs_set_blob(handle, RADAR_NVS_KEY, &store, sizeof(store));
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ret = nvs_commit(handle);
     }
 
     nvs_close(handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(g_radar_tag, "save thresholds to NVS failed: %s", esp_err_to_name(ret));
         return ret;
     }
@@ -195,7 +213,8 @@ esp_err_t radar_load_thresholds_from_nvs(void)
     size_t required_size = sizeof(store);
 
     esp_err_t ret = nvs_open(RADAR_NVS_NAMESPACE, NVS_READONLY, &handle);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGW(g_radar_tag, "open NVS for load failed: %s", esp_err_to_name(ret));
         return ret;
     }
@@ -203,19 +222,24 @@ esp_err_t radar_load_thresholds_from_nvs(void)
     ret = nvs_get_blob(handle, RADAR_NVS_KEY, &store, &required_size);
     nvs_close(handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGW(g_radar_tag, "load thresholds from NVS failed: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    if (required_size == sizeof(store) && store.magic == RADAR_THRESHOLD_MAGIC && store.version == 2) {
+    if (required_size == sizeof(store) && store.magic == RADAR_THRESHOLD_MAGIC && store.version == 2)
+    {
         g_wander_threshold = store.wander_threshold;
         g_jitter_threshold = store.jitter_threshold;
         g_no_person_wander_baseline = store.no_person_wander_baseline;
         g_static_jitter_baseline = store.static_jitter_baseline;
-    } else if (required_size == sizeof(store_v1)) {
+    }
+    else if (required_size == sizeof(store_v1))
+    {
         memcpy(&store_v1, &store, sizeof(store_v1));
-        if (store_v1.magic != RADAR_THRESHOLD_MAGIC || store_v1.version != 1) {
+        if (store_v1.magic != RADAR_THRESHOLD_MAGIC || store_v1.version != 1)
+        {
             ESP_LOGW(g_radar_tag, "legacy NVS threshold data is invalid");
             return ESP_ERR_INVALID_RESPONSE;
         }
@@ -223,7 +247,9 @@ esp_err_t radar_load_thresholds_from_nvs(void)
         g_jitter_threshold = store_v1.jitter_threshold;
         g_no_person_wander_baseline = 1.0f - g_wander_threshold;
         g_static_jitter_baseline = 1.0f - g_jitter_threshold;
-    } else {
+    }
+    else
+    {
         ESP_LOGW(g_radar_tag, "NVS threshold data is invalid");
         return ESP_ERR_INVALID_RESPONSE;
     }
@@ -247,30 +273,38 @@ radar_state_t radar_get_desired_state(float wander,
                                       float motion_enter_threshold,
                                       float motion_exit_threshold)
 {
-    if (g_radar_state == RADAR_STATE_MOTION) {
-        if (jitter > motion_exit_threshold) {
+    if (g_radar_state == RADAR_STATE_MOTION)
+    {
+        if (jitter > motion_exit_threshold)
+        {
             return RADAR_STATE_MOTION;
         }
-        if (wander > presence_enter_threshold || wander > presence_exit_threshold) {
+        if (wander > presence_enter_threshold || wander > presence_exit_threshold)
+        {
             return RADAR_STATE_PRESENCE;
         }
         return RADAR_STATE_EMPTY;
     }
 
-    if (g_radar_state == RADAR_STATE_PRESENCE) {
-        if (jitter > motion_enter_threshold) {
+    if (g_radar_state == RADAR_STATE_PRESENCE)
+    {
+        if (jitter > motion_enter_threshold)
+        {
             return RADAR_STATE_MOTION;
         }
-        if (wander > presence_exit_threshold) {
+        if (wander > presence_exit_threshold)
+        {
             return RADAR_STATE_PRESENCE;
         }
         return RADAR_STATE_EMPTY;
     }
 
-    if (jitter > motion_enter_threshold) {
+    if (jitter > motion_enter_threshold)
+    {
         return RADAR_STATE_MOTION;
     }
-    if (wander > presence_enter_threshold) {
+    if (wander > presence_enter_threshold)
+    {
         return RADAR_STATE_PRESENCE;
     }
     return RADAR_STATE_EMPTY;
@@ -281,22 +315,28 @@ void radar_update_stable_state(radar_state_t desired_state)
     const uint8_t required_confirm_frames =
         (desired_state == RADAR_STATE_EMPTY) ? RADAR_EMPTY_CONFIRM_FRAMES : RADAR_STATE_CONFIRM_FRAMES;
 
-    if (desired_state == g_radar_state) {
+    if (desired_state == g_radar_state)
+    {
         g_radar_candidate_state = g_radar_state;
         g_radar_candidate_count = 0;
         return;
     }
 
-    if (desired_state == g_radar_candidate_state) {
-        if (g_radar_candidate_count < UINT8_MAX) {
+    if (desired_state == g_radar_candidate_state)
+    {
+        if (g_radar_candidate_count < UINT8_MAX)
+        {
             g_radar_candidate_count++;
         }
-    } else {
+    }
+    else
+    {
         g_radar_candidate_state = desired_state;
         g_radar_candidate_count = 1;
     }
 
-    if (g_radar_candidate_count >= required_confirm_frames) {
+    if (g_radar_candidate_count >= required_confirm_frames)
+    {
         g_radar_state = desired_state;
         g_radar_candidate_state = g_radar_state;
         g_radar_candidate_count = 0;
@@ -307,7 +347,8 @@ void radar_rx_cb(void *ctx, const wifi_radar_info_t *info)
 {
     (void)ctx;
 
-    if (g_training_in_progress || !g_thresholds_ready) {
+    if (g_training_in_progress || !g_thresholds_ready)
+    {
         ESP_LOGD(g_radar_tag, "state=training wander=%.3f jitter=%.3f",
                  info->waveform_wander, info->waveform_jitter);
         return;
@@ -386,11 +427,15 @@ esp_err_t radar_init(void)
     ESP_ERROR_CHECK(esp_radar_dec_init(&dec_config));
 
     load_ret = radar_load_thresholds_from_nvs();
-    if (load_ret != ESP_OK) {
+    if (load_ret != ESP_OK)
+    {
         ESP_LOGW(g_radar_tag, "thresholds are not ready yet, training is required");
-    } else {
+    }
+    else
+    {
         train_data_ret = radar_load_train_data_from_nvs();
-        if (train_data_ret != ESP_OK) {
+        if (train_data_ret != ESP_OK)
+        {
             ESP_LOGW(g_radar_tag, "train data is not ready yet, wander may stay zero until retraining");
         }
     }
@@ -407,7 +452,12 @@ esp_err_t radar_train(uint32_t train_ms)
 
     ESP_ERROR_CHECK(esp_radar_train_start());
     vTaskDelay(pdMS_TO_TICKS(train_ms));
-    ESP_ERROR_CHECK(esp_radar_train_stop(&g_wander_threshold, &g_jitter_threshold));
+    esp_err_t train_ret = esp_radar_train_stop(&g_wander_threshold, &g_jitter_threshold);
+    if (train_ret != ESP_OK) {
+        ESP_LOGW(g_radar_tag, "train stop failed (0x%x), skipping training this boot", train_ret);
+        g_training_in_progress = false;
+        return train_ret;
+    }
 
     g_training_in_progress = false;
     g_thresholds_ready = true;

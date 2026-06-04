@@ -59,7 +59,7 @@ static void radar_task(void *pvParameters)
 
 void app_main(void)
 {
-    /*
+    
     sg90_init();
 
     ESP_ERROR_CHECK(wifista_init());
@@ -85,14 +85,14 @@ void app_main(void)
         ESP_ERROR_CHECK(radar_train(5000));
     }
 
-    ESP_ERROR_CHECK(inmp441_init());
+    //ESP_ERROR_CHECK(inmp441_init());
 
-    ESP_ERROR_CHECK(app_sr_start());
+    //ESP_ERROR_CHECK(app_sr_start());
 
     const esp_app_desc_t *desc = esp_app_get_description();
     printf("version:%s", desc->version);
 
-    */
+    
 
     // 1. LCD 硬件初始化（屏幕点亮）
     ESP_ERROR_CHECK(lcd_init());

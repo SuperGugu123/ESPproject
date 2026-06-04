@@ -6,9 +6,11 @@ static const char *TAG = "LVGL";
 static _lock_t lvgl_api_lock;
 
 // ===== 全局对象 =====
-static lv_display_t *lvgl_disp = NULL;                      // 显示设备
-static lv_obj_t *btn;                                       // 旋转按钮
-static lv_display_rotation_t rotation = LV_DISP_ROTATION_0; // 当前旋转状态
+static lv_display_t *lvgl_disp = NULL; // 显示设备
+static lv_obj_t *main_screen = NULL;   // 主界面
+static lv_obj_t *home_screen = NULL;   // 家居界面
+static lv_obj_t *time_label = NULL;    // 时间标签
+static bool ntp_synced = false;        // NTP 是否已同步
 
 // SPI 颜色传输完成回调：DMA 传输结束后通知 LVGL 刷屏完成
 static bool lvgl_port_update_callback(esp_lcd_panel_io_handle_t io,
@@ -32,59 +34,139 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
     esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
 }
 
-// ==================== 按钮回调：每次点击旋转 90° ====================
+// ==================== NTP 北京时间 ====================
 
-void btn_cb(lv_event_t *e)
+// NTP 初始化（需在 WiFi 连接后调用）
+void lvgl_ntp_init(void)
 {
-    lv_display_t *disp = lv_event_get_user_data(e);
-    rotation++;
-    if (rotation > LV_DISP_ROTATION_270)
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "ntp.aliyun.com");
+    esp_sntp_setservername(1, "pool.ntp.org");
+    esp_sntp_init();
+    setenv("TZ", "CST-8", 1);
+    tzset();
+    ntp_synced = true;
+}
+
+// LVGL 定时器：每秒更新一次时间显示
+void time_update_cb(lv_timer_t *timer)
+{
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    char buf[32];
+    strftime(buf, sizeof(buf), "%H:%M", &timeinfo);
+    lv_label_set_text(time_label, buf);
+}
+
+// ==================== 退出回调 ====================
+void exit_cb(lv_event_t *e)
+{
+    ESP_LOGW(TAG, "=== EXIT btn pressed ===");
+    lv_obj_clean(lv_scr_act());
+    esp_lcd_panel_disp_on_off(lcd_panel_handle(), false);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
+}
+
+// ==================== 家居界面回调 ====================
+void light_btn_cb(lv_event_t *e)
+{
+    static bool light_on = false;
+    lv_obj_t *btn = lv_event_get_target(e);
+    ESP_LOGI(TAG, "=== LIGHT btn pressed ===");
+
+    if (light_on)
     {
-        rotation = LV_DISP_ROTATION_0;
+        mqtt_sg90_off();
+        lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_GREY), LV_STATE_DEFAULT);
     }
-    lv_disp_set_rotation(disp, rotation);
+    else
+    {
+        mqtt_sg90_on();
+        lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_YELLOW), LV_STATE_DEFAULT);
+    }
+    light_on = !light_on;
 }
 
-// 弧形动画回调
-
-void set_lvgl_angle(void *obj, int32_t v)
+void ret_cb(lv_event_t *e)
 {
-    lv_arc_set_value(obj, v);
+    ESP_LOGI(TAG, "=== RETURN btn pressed ===");
+    lv_scr_load(main_screen);
 }
 
-// ==================== 演示 UI ====================
+void home_cb(lv_event_t *e)
+{
+    ESP_LOGI(TAG, "=== HOME btn pressed ===");
+    if (!home_screen)
+    {
+        home_screen = lv_obj_create(NULL);
+
+        // 灯光控制按钮
+        lv_obj_t *light_btn = lv_button_create(home_screen);
+        lv_obj_set_size(light_btn, 120, 60);
+        lv_obj_align(light_btn, LV_ALIGN_CENTER, 0, -50);
+        lv_obj_t *lbl = lv_label_create(light_btn);
+        lv_label_set_text_static(lbl, LV_SYMBOL_POWER " LIGHT");
+        lv_obj_set_style_bg_color(light_btn, lv_palette_main(LV_PALETTE_GREY), LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(light_btn, lv_palette_main(LV_PALETTE_GREY), LV_STATE_PRESSED);
+        lv_obj_add_event_cb(light_btn, light_btn_cb, LV_EVENT_PRESSED, NULL);
+
+        // 返回主界面按钮
+        lv_obj_t *ret_btn = lv_button_create(home_screen);
+        lv_obj_set_size(ret_btn, 120, 60);
+        lv_obj_align(ret_btn, LV_ALIGN_CENTER, 0, 50);
+        lbl = lv_label_create(ret_btn);
+        lv_label_set_text_static(lbl, LV_SYMBOL_HOME " RETURN");
+        lv_obj_add_event_cb(ret_btn, ret_cb, LV_EVENT_PRESSED, NULL);
+    }
+    lv_scr_load(home_screen);
+}
+
+// ==================== 主界面 UI ====================
 
 void lvgl_demo_ui(lv_display_t *disp)
 {
-    lv_obj_t *scr = lv_display_get_screen_active(disp);
+    main_screen = lv_display_get_screen_active(disp);
 
-    // --- 按钮：点击旋转屏幕 ---
-    btn = lv_button_create(scr);
-    lv_obj_t *lbl = lv_label_create(btn);
-    lv_label_set_text_static(lbl, LV_SYMBOL_REFRESH " ROTATE");
-    lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT, 30, -30);
-    lv_obj_add_event_cb(btn, btn_cb, LV_EVENT_CLICKED, disp);
+    // ===== 时间（占屏幕上 1/3，锁屏风格大字）=====
+    static lv_style_t style_time;
+    lv_style_init(&style_time);
+    lv_style_set_text_font(&style_time, &lv_font_montserrat_48);
+    lv_style_set_text_color(&style_time, lv_color_black());
 
-    // --- 弧形进度条（动画演示） ---
-    lv_obj_t *arc = lv_arc_create(scr);
-    lv_arc_set_rotation(arc, 270);
-    lv_arc_set_bg_angles(arc, 0, 360);
-    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);   // 隐藏旋钮，只显示进度
-    lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE); // 禁止手动点击调节
-    lv_obj_center(arc);
+    time_label = lv_label_create(main_screen);
+    lv_label_set_text_static(time_label, "00:00");
+    lv_obj_add_style(time_label, &style_time, 0);
+    lv_obj_set_size(time_label, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 40);
 
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, arc);
-    lv_anim_set_exec_cb(&a, set_lvgl_angle);
-    lv_anim_set_duration(&a, 1000);
-    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_repeat_delay(&a, 500);
-    lv_anim_set_values(&a, 0, 100);
-    lv_anim_start(&a);
+    // 每秒刷新时间的定时器
+    lv_timer_create(time_update_cb, 1000, NULL);
+
+    // ===== 家居按钮 =====
+    lv_obj_t *home_btn = lv_button_create(main_screen);
+    lv_obj_set_size(home_btn, 160, 70);
+    lv_obj_align(home_btn, LV_ALIGN_CENTER, 0, 5);
+    lv_obj_set_style_bg_color(home_btn, lv_palette_main(LV_PALETTE_BLUE), LV_STATE_DEFAULT);
+    lv_obj_t *home_lbl = lv_label_create(home_btn);
+    lv_label_set_text_static(home_lbl, LV_SYMBOL_HOME " JIAJU");
+    lv_obj_add_event_cb(home_btn, home_cb, LV_EVENT_PRESSED, NULL);
+
+    // ===== 退出按钮（与家居按钮等大等距）=====
+    lv_obj_t *exit_btn = lv_button_create(main_screen);
+    lv_obj_set_size(exit_btn, 160, 70);
+    lv_obj_align(exit_btn, LV_ALIGN_CENTER, 0, 100);
+    lv_obj_set_style_bg_color(exit_btn, lv_palette_main(LV_PALETTE_RED), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(exit_btn, lv_palette_main(LV_PALETTE_RED), LV_STATE_PRESSED);
+    lv_obj_t *exit_lbl = lv_label_create(exit_btn);
+    lv_label_set_text_static(exit_lbl, LV_SYMBOL_CLOSE " EXIT");
+    lv_obj_add_event_cb(exit_btn, exit_cb, LV_EVENT_PRESSED, NULL);
 }
 
-// ==================== LVGL 时钟滴答 ====================
+// LVGL 时钟滴答
 
 void increase_lvgl_tick(void *arg)
 {
@@ -112,19 +194,17 @@ void lvgl_port_task(void *arg)
 
 void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
-    uint16_t touchpad_x[1] = {0};
-    uint16_t touchpad_y[1] = {0};
-    uint8_t touchpad_cnt = 0;
+    esp_lcd_touch_point_data_t tp_data[1] = {0};
+    uint8_t tp_cnt = 0;
 
     esp_lcd_touch_handle_t touch_pad = lv_indev_get_user_data(indev);
     esp_lcd_touch_read_data(touch_pad);
-    bool touchpad_pressed = esp_lcd_touch_get_coordinates(touch_pad, touchpad_x, touchpad_y,
-                                                          NULL, &touchpad_cnt, 1);
+    esp_lcd_touch_get_data(touch_pad, tp_data, &tp_cnt, 1);
 
-    if (touchpad_pressed && touchpad_cnt > 0)
+    if (tp_cnt > 0)
     {
-        data->point.x = touchpad_x[0];
-        data->point.y = touchpad_y[0];
+        data->point.x = tp_data[0].x;
+        data->point.y = tp_data[0].y;
         data->state = LV_INDEV_STATE_PRESSED;
     }
     else
@@ -138,6 +218,9 @@ void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
 void lvgl_start(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t io)
 {
     _lock_init(&lvgl_api_lock);
+
+    // NTP 时间同步（需 WiFi 已连接）
+    lvgl_ntp_init();
 
     // 初始化 LVGL 内部状态
     lv_init();

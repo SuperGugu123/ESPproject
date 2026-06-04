@@ -15,6 +15,9 @@
 #include "esp_lcd_touch.h"
 #include "lvgl.h"
 #include "lcd.h"
+#include "app_mqtt.h"
+#include "esp_sntp.h"
+#include <time.h>
 
 //  LVGL 参数
 #define LVGL_DRAW_BUF_LINES 20                             // 绘制缓冲覆盖的行数（建议 ≥ 屏幕高度的 1/10）
@@ -27,12 +30,19 @@
 //  LVGL 总入口
 void lvgl_start(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t io);
 
-// 演示 UI
+// 演示 UI（主界面）
 void lvgl_demo_ui(lv_display_t *disp);
 
-// ===== 内部回调（FreeRTOS 任务/定时器需要） =====
-void btn_cb(lv_event_t *e);
-void set_lvgl_angle(void *obj, int32_t v);
+// NTP 北京时间同步（需在 WiFi 连接后调用）
+void lvgl_ntp_init(void);
+void time_update_cb(lv_timer_t *timer);
+
+void exit_cb(lv_event_t *e);
+void home_cb(lv_event_t *e);
+void ret_cb(lv_event_t *e);
+void light_btn_cb(lv_event_t *e);
+
+
 void increase_lvgl_tick(void *arg);
 void lvgl_port_task(void *arg);
 void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data);
