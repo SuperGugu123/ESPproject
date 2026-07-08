@@ -37,7 +37,7 @@ void wifista_event_handler(void *event_handler_arg, esp_event_base_t event_base,
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
-        esp_wifi_connect();
+        ESP_LOGI(TAG, "Wi-Fi started, waiting for connect command");
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
@@ -58,104 +58,96 @@ void wifista_event_handler(void *event_handler_arg, esp_event_base_t event_base,
     }
 }
 
-esp_err_t wifista_init(void)
+bool wifi_is_connected(void)
 {
-    esp_err_t ret;
-
-    // 先准备 NVS。
-    // Wi-Fi 驱动本身就依赖 NVS，如果这里没初始化好，后面联网也跑不起来。
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ret = nvs_flash_erase();
-        if (ret != ESP_OK)
-        {
-            return ret;
-        }
-        ret = nvs_flash_init();
-    }
-
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    ret = esp_netif_init();
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    ret = esp_event_loop_create_default();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
-    {
-        return ret;
-    }
-
-    s_wifi_event_group = xEventGroupCreate();
     if (s_wifi_event_group == NULL)
     {
-        return ESP_ERR_NO_MEM;
+        return false;
     }
+    return (xEventGroupGetBits(s_wifi_event_group) & WIFI_CONNECTED_BIT) != 0;
+}
+
+esp_err_t wifista_base_init(void)
+{
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    s_wifi_event_group = xEventGroupCreate();
+    assert(s_wifi_event_group);
 
     esp_netif_create_default_wifi_sta();
-
-    ret = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifista_event_handler, NULL);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    ret = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifista_event_handler, NULL);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifista_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifista_event_handler, NULL));
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ret = esp_wifi_init(&cfg);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
+    ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20));
+    ESP_ERROR_CHECK(esp_wifi_start());
 
-    wifi_config_t wifista_config = { 0 };
-    strlcpy((char *)wifista_config.sta.ssid, DEFAULT_SSID, sizeof(wifista_config.sta.ssid));
-    strlcpy((char *)wifista_config.sta.password, DEFAULT_PWD, sizeof(wifista_config.sta.password));
-
-    ret = esp_wifi_set_mode(WIFI_MODE_STA);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    // 这里把 STA 协议限制在 2.4G 下最常见、也最合法的 b/g/n 组合
-    ret = esp_wifi_set_protocol(WIFI_IF_STA,
-                                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    // 带宽继续固定为 HT20，尽量让链路状态和后面的 CSI 使用场景保持一致
-    ret = esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    ret = esp_wifi_set_config(WIFI_IF_STA, &wifista_config);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    ret = esp_wifi_start();
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
     return ESP_OK;
+}
+
+esp_err_t wifi_connect_to_ap(const char *ssid, const char *password)
+{
+    wifi_config_t wifista_config = {0};
+    strlcpy((char *)wifista_config.sta.ssid, ssid, sizeof(wifista_config.sta.ssid));
+    strlcpy((char *)wifista_config.sta.password, password, sizeof(wifista_config.sta.password));
+
+    esp_err_t ret = esp_wifi_set_config(WIFI_IF_STA, &wifista_config);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "set config failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Connecting to SSID: %s", ssid);
+    return esp_wifi_connect();
+}
+
+esp_err_t wifi_save_credentials(const char *ssid, const char *password)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(WIFI_NVS_NS, NVS_READWRITE, &handle);
+    if (ret != ESP_OK)
+        return ret;
+
+    ret = nvs_set_str(handle, WIFI_NVS_SSID, ssid);
+    if (ret == ESP_OK)
+    {
+        ret = nvs_set_str(handle, WIFI_NVS_PWD, password);
+    }
+    nvs_commit(handle);
+    nvs_close(handle);
+    return ret;
+}
+
+esp_err_t wifi_load_credentials(char *ssid, size_t ssid_len, char *pwd, size_t pwd_len)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(WIFI_NVS_NS, NVS_READONLY, &handle);
+    if (ret != ESP_OK)
+        return ret;
+
+    size_t len = ssid_len;
+    ret = nvs_get_str(handle, WIFI_NVS_SSID, ssid, &len);
+    if (ret != ESP_OK)
+    {
+        nvs_close(handle);
+        return ret;
+    }
+
+    len = pwd_len;
+    ret = nvs_get_str(handle, WIFI_NVS_PWD, pwd, &len);
+    nvs_close(handle);
+    return ret;
 }

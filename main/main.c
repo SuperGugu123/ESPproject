@@ -59,10 +59,18 @@ static void radar_task(void *pvParameters)
 
 void app_main(void)
 {
-    
     sg90_init();
 
-    ESP_ERROR_CHECK(wifista_init());
+    ESP_ERROR_CHECK(lcd_init());
+
+    ESP_ERROR_CHECK(wifista_base_init());
+
+    lvgl_start(lcd_panel_handle(), lcd_io_handle());
+
+    if (g_wifi_sync_group)
+    {
+        xEventGroupWaitBits(g_wifi_sync_group, WIFI_CONFIG_DONE_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+    }
 
     mqtt_app_start();
 
@@ -80,23 +88,13 @@ void app_main(void)
 
     if (RADAR_FORCE_TRAIN_ON_BOOT)
     {
-        vTaskDelay(pdMS_TO_TICKS(5000));
-
+        vTaskDelay(pdMS_TO_TICKS(3000));
         ESP_ERROR_CHECK(radar_train(5000));
     }
 
-    //ESP_ERROR_CHECK(inmp441_init());
-
-    //ESP_ERROR_CHECK(app_sr_start());
+    ESP_ERROR_CHECK(inmp441_init());
+    ESP_ERROR_CHECK(app_sr_start());
 
     const esp_app_desc_t *desc = esp_app_get_description();
     printf("version:%s", desc->version);
-
-    
-
-    // 1. LCD 硬件初始化（屏幕点亮）
-    ESP_ERROR_CHECK(lcd_init());
-
-    // 2. LVGL 初始化 + 显示 UI
-    lvgl_start(lcd_panel_handle(), lcd_io_handle());
 }

@@ -29,6 +29,7 @@ set(requires
     esp_event
     esp_lcd
     esp_lcd_ili9341
+    esp_lcd_touch
     esp_lcd_touch_xpt2046
     lvgl
     esp_netif

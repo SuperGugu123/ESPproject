@@ -17,6 +17,7 @@
 #include "freertos/task.h"
 #include "inmp441.h"
 #include "model_path.h"
+#include "app_mqtt.h"
 
 // AFE 输入通道格式
 // 当前硬件只接了一个 INMP441 麦克风，所以使用 "M"

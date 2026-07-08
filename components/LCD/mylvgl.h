@@ -7,6 +7,7 @@
 #include <sys/param.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_timer.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -18,6 +19,10 @@
 #include "app_mqtt.h"
 #include "esp_sntp.h"
 #include <time.h>
+
+//  WiFi 配置完成信号（LVGL → main 同步用）
+#define WIFI_CONFIG_DONE_BIT BIT0
+extern EventGroupHandle_t g_wifi_sync_group;
 
 //  LVGL 参数
 #define LVGL_DRAW_BUF_LINES 20                             // 绘制缓冲覆盖的行数（建议 ≥ 屏幕高度的 1/10）
@@ -41,6 +46,8 @@ void exit_cb(lv_event_t *e);
 void home_cb(lv_event_t *e);
 void ret_cb(lv_event_t *e);
 void light_btn_cb(lv_event_t *e);
+void change_wifi_cb(lv_event_t *e);
+void lvgl_show_change_wifi(void);
 
 
 void increase_lvgl_tick(void *arg);

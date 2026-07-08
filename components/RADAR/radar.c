@@ -21,6 +21,8 @@ bool g_training_in_progress = false;
 radar_state_t g_radar_state = RADAR_STATE_EMPTY;
 radar_state_t g_radar_candidate_state = RADAR_STATE_EMPTY;
 uint8_t g_radar_candidate_count = 0;
+float g_last_wander = 0.0f;
+float g_last_jitter = 0.0f;
 
 static float radar_get_presence_signal(float wander, float jitter, float motion_enter_threshold);
 static esp_err_t radar_save_train_data_to_nvs(void);
@@ -347,6 +349,9 @@ void radar_rx_cb(void *ctx, const wifi_radar_info_t *info)
 {
     (void)ctx;
 
+    g_last_wander = info->waveform_wander;
+    g_last_jitter = info->waveform_jitter;
+
     if (g_training_in_progress || !g_thresholds_ready)
     {
         ESP_LOGD(g_radar_tag, "state=training wander=%.3f jitter=%.3f",
@@ -371,6 +376,39 @@ void radar_rx_cb(void *ctx, const wifi_radar_info_t *info)
 
     radar_update_stable_state(desired_state);
 
+    /* 每 100 帧打印一次 INFO 级别日志（~1秒一次），方便调试状态切换 */
+    static uint32_t s_frame_cnt = 0;
+    s_frame_cnt++;
+
+    /* 状态变化时立即打印 */
+    static radar_state_t s_last_logged_state = RADAR_STATE_EMPTY;
+    bool state_changed = (g_radar_state != s_last_logged_state);
+    bool periodic = (s_frame_cnt % 100 == 0);
+
+    if (state_changed || periodic)
+    {
+        s_last_logged_state = g_radar_state;
+        ESP_LOGI(g_radar_tag,
+                 "[%lu] state=%s desired=%s confirm=%u/%u | wander=%.4f pres_sig=%.4f jitter=%.4f | "
+                 "th_enter(w=%.4f j=%.4f) th_exit(w=%.4f j=%.4f) | raw_th(w=%.4f j=%.4f)",
+                 (unsigned long)s_frame_cnt,
+                 radar_state_to_string(g_radar_state),
+                 radar_state_to_string(desired_state),
+                 g_radar_candidate_count,
+                 (desired_state == RADAR_STATE_EMPTY) ? (unsigned)RADAR_EMPTY_CONFIRM_FRAMES
+                                                      : (unsigned)RADAR_STATE_CONFIRM_FRAMES,
+                 info->waveform_wander,
+                 presence_signal,
+                 info->waveform_jitter,
+                 presence_enter_threshold,
+                 motion_enter_threshold,
+                 presence_exit_threshold,
+                 motion_exit_threshold,
+                 g_wander_threshold,
+                 g_jitter_threshold);
+    }
+
+    /* 每帧 DEBUG 级别详细日志，需要时在 menuconfig 中开启 */
     ESP_LOGD(g_radar_tag,
              "state=%s desired=%s confirm=%u wander=%.3f presence_sig=%.3f jitter=%.3f th_w=%.3f th_j=%.3f exit_w=%.3f exit_j=%.3f raw_w=%.3f raw_j=%.3f",
              radar_state_to_string(g_radar_state),
@@ -450,13 +488,28 @@ esp_err_t radar_train(uint32_t train_ms)
     g_training_in_progress = true;
     radar_reset_state_machine();
 
+    /* 清除旧的 NVS 训练数据，确保全新训练 */
+    nvs_handle_t handle;
+    if (nvs_open(RADAR_NVS_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK)
+    {
+        nvs_erase_key(handle, RADAR_TRAIN_DATA_KEY);
+        nvs_erase_key(handle, RADAR_NVS_KEY);
+        nvs_commit(handle);
+        nvs_close(handle);
+        ESP_LOGI(g_radar_tag, "old NVS radar data erased, starting fresh training");
+    }
+
     ESP_ERROR_CHECK(esp_radar_train_start());
+    ESP_LOGI(g_radar_tag, "training started, waiting %lu ms...", (unsigned long)train_ms);
     vTaskDelay(pdMS_TO_TICKS(train_ms));
+    ESP_LOGI(g_radar_tag, "delay done, stopping training...");
     esp_err_t train_ret = esp_radar_train_stop(&g_wander_threshold, &g_jitter_threshold);
+    ESP_LOGI(g_radar_tag, "train stop returned: 0x%x", train_ret);
     if (train_ret != ESP_OK) {
         ESP_LOGW(g_radar_tag, "train stop failed (0x%x), skipping training this boot", train_ret);
         g_training_in_progress = false;
-        return train_ret;
+        g_thresholds_ready = true;
+        return ESP_OK;
     }
 
     g_training_in_progress = false;
@@ -464,6 +517,19 @@ esp_err_t radar_train(uint32_t train_ms)
     radar_reset_state_machine();
     g_no_person_wander_baseline = 1.0f - g_wander_threshold;
     g_static_jitter_baseline = 1.0f - g_jitter_threshold;
+
+    /* 训练后质量检查：等 2 秒采集 CSI 帧，确认空房间 wander 是否归零 */
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    if (g_last_wander > 0.05f)
+    {
+        ESP_LOGW(g_radar_tag,
+                 "Training quality CHECK FAILED: wander=%.4f (should be <0.05). Room may not be empty, or RF environment is noisy!",
+                 g_last_wander);
+    }
+    else
+    {
+        ESP_LOGI(g_radar_tag, "Training quality CHECK OK: wander=%.4f", g_last_wander);
+    }
 
     ESP_LOGI(g_radar_tag,
              "train done raw_wander_th=%.3f raw_jitter_th=%.3f baseline_w=%.3f baseline_j=%.3f effective_wander_th=%.3f effective_jitter_th=%.3f empty_confirm=%u",

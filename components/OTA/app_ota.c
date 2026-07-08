@@ -175,6 +175,7 @@ void ota_task(void *pvParameter)
             err = esp_ota_write(update_handle, (const void *)ota_write_data, data_read);
             if (err != ESP_OK)
             {
+                ESP_LOGE(TAG, "esp_ota_write 失败 (%s), 已写入 %d 字节", esp_err_to_name(err), binary_file_length);
                 http_cleanup(client);
                 esp_ota_abort(update_handle);
                 task_fatal_error();

@@ -22,7 +22,7 @@
 #define BUFFSIZE 1024
 #define HASH_LEN 32
 #define CONFIG_EXAMPLE_OTA_RECV_TIMEOUT 8000
-#define OTA_UPDATE_HTTP_URL "http://bin.bemfa.com/b/347233/3BcYjY3YjFkMDA1MjY2NDAxNjgyMDhhMGNmMGJiYzc3YjM=OTA.bin"
+#define OTA_UPDATE_HTTP_URL "http://bin.bemfa.com/b/320653/3BcMDk1ODljNzM4NTJiZWUwOGY4ZGRjNzJkYzliNDg4MjQ=ESP32S3.bin"
 
 void ota_start(void);
 void ota_task(void *pvParameter);

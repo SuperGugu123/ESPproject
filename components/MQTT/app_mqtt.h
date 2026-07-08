@@ -6,9 +6,9 @@
 #include "esp_err.h"
 #include "esp_event.h"
 
-#define MQTT_BROKER_URL "mqtt://10.45.91.78:1883" // MQTT 服务器地址
-#define MQTT_BROKER_USERNAME "supergu"            // MQTT 服务器用户名
-#define MQTT_BROKER_PASSWORD "1284529154"         // MQTT 服务器密码
+#define MQTT_BROKER_URL "mqtt://192.168.31.25:1883" // MQTT 服务器地址
+#define MQTT_BROKER_USERNAME "supergu"              // MQTT 服务器用户名
+#define MQTT_BROKER_PASSWORD "1284529154"           // MQTT 服务器密码
 
 void mqtt_app_start(void);
 esp_err_t mqtt_publish_command(const char *topic, const char *payload);

@@ -1,5 +1,4 @@
 #include "app_sr.h"
-#include "sg90.h"
 
 static const char *TAG = "app_sr";
 
@@ -10,8 +9,8 @@ static QueueHandle_t s_result_que = NULL;
 static srmodel_list_t *s_models = NULL;
 
 static const char *const s_cmd_phoneme[] = {
-    "da kai tai deng",
-    "guan bi tai deng",
+    "da kai kong tiao",
+    "guan bi kong tiao",
 };
 
 int16_t app_sr_convert_inmp441_sample(int32_t raw_sample)
@@ -218,27 +217,13 @@ void sr_handler_task(void *pvParam)
             switch (result.command_id)
             {
             case 0:
-                // 模拟打开台灯
-                if (sg90_set_angle(SG90_DEFAULT_OPEN_ANGLE) == ESP_OK)
-                {
-                    ESP_LOGI(TAG, "opening the lamp, servo angle=%d", SG90_DEFAULT_OPEN_ANGLE);
-                }
-                else
-                {
-                    ESP_LOGE(TAG, "failed to open the lamp");
-                }
+                // 打开空调
+                mqtt_sg90_on();
                 break;
 
             case 1:
-                // 模拟关闭台灯
-                if (sg90_set_angle(SG90_MIN_ANGLE) == ESP_OK)
-                {
-                    ESP_LOGI(TAG, "closing the lamp, servo angle=%d", SG90_MIN_ANGLE);
-                }
-                else
-                {
-                    ESP_LOGE(TAG, "failed to close the lamp");
-                }
+                // 关闭空调
+                mqtt_sg90_off();
                 break;
 
             default:
